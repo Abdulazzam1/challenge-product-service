@@ -1,98 +1,139 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+Tidak, file `README.md` yang Anda kirim **masih terpotong** dan belum lengkap. File itu sepertinya tercampur dengan teks percakapan kita sebelumnya dan berhenti di tengah jalan.
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Berikut adalah **versi lengkap dan final** yang 100% utuh dari awal sampai akhir. Silakan salin dan tempel *hanya* teks di dalam blok kode di bawah ini.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+````markdown
+# Tantangan Uji Full Stack: Arsitektur Microservice NestJS & Go
 
-## Description
+Ini adalah implementasi untuk tantangan uji full stack, yang membangun aplikasi berbasis 5 tumpukan (stack) teknologi yang diorkestrasi oleh Docker Compose.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+* **Layanan Produk (NestJS):** `challenge-product-service`
+* **Layanan Pesanan (Go):** `challenge-order-service`
 
-## Project setup
+## 1. Arsitektur
+
+Aplikasi ini menggunakan arsitektur microservice berbasis *event-driven*:
+
+1.  **`product-service` (NestJS):** Bertanggung jawab atas CRUD produk.
+2.  **`order-service` (Go):** Bertanggung jawab atas CRUD pesanan.
+3.  **`PostgreSQL`:** Database utama untuk kedua layanan.
+4.  **`RabbitMQ`:** Berfungsi sebagai *message broker*.
+5.  **`Redis`:** Berfungsi sebagai *caching layer*.
+
+### Alur Kerja (Event-Driven)
+
+Alur utama (`POST /orders`) dirancang untuk asinkron:
+1.  Klien mengirim `POST /api/v1/orders` ke **`order-service` (Go)**.
+2.  Layanan Go menyimpan pesanan ke DB (status `PENDING`) dan segera mem-publish event `order.created` ke **RabbitMQ**.
+3.  **`product-service` (NestJS)** mendengarkan event `order.created` tersebut.
+4.  Setelah menerima event, NestJS mengurangi `qty` produk di databasenya dan menghapus *cache* produk yang relevan.
+
+## 2. Cara Menjalankan
+
+### Prasyarat
+* Docker & Docker Compose
+* Git
+
+### Langkah-langkah
+1.  Clone kedua repositori ke dalam folder yang sama (berdampingan):
+    ```bash
+    git clone [URL_REPO_PRODUCT_SERVICE]
+    git clone [URL_REPO_ORDER_SERVICE]
+    ```
+
+2.  Masuk ke folder `challenge-order-service`:
+    ```bash
+    cd challenge-order-service
+    ```
+
+3.  Jalankan Docker Compose:
+    ```bash
+    docker-compose up --build -d
+    ```
+    Perintah ini akan membangun *image* untuk kedua layanan dan menjalankan semua 5 kontainer.
+
+## 3. Contoh API (cURL)
+
+### a. Membuat Produk Baru
+```bash
+curl --location 'http://localhost:3000/products' \
+--header 'Content-Type: application/json' \
+--data '{
+    "name": "Laptop Demo",
+    "price": 1500,
+    "qty": 50
+}'
+````
+
+### b. Mengambil Produk (Cached)
+
+(Gunakan ID yang didapat dari langkah 'a')
 
 ```bash
-$ npm install
+curl --location 'http://localhost:3000/products/[ID_PRODUK_ANDA]'
 ```
 
-## Compile and run the project
+### c. Membuat Pesanan Baru
+
+(Gunakan ID yang didapat dari langkah 'a')
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+curl --location 'http://localhost:8080/api/v1/orders' \
+--header 'Content-Type: application/json' \
+--data '{
+    "productId": "[ID_PRODUK_ANDA]",
+    "quantity": 2
+}'
 ```
 
-## Run tests
+### d. Mengambil Pesanan per Produk (Cached)
+
+(Gunakan ID yang didapat dari langkah 'a')
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+curl --location 'http://localhost:8080/api/v1/orders/product/[ID_PRODUK_ANDA]'
 ```
 
-## Deployment
+## 4\. Hasil Pengujian
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### 4.1. Tes Fungsional (End-to-End)
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Semua alur fungsional telah divalidasi secara manual:
+
+  * `POST /orders` (Go) berhasil memicu pengurangan `qty` di `product-service` (NestJS) melalui RabbitMQ, yang dibuktikan dengan berkurangnya stok produk saat diperiksa.
+
+### 4.2. Tes Unit
+
+Kedua layanan telah memenuhi syarat "setidaknya satu unit test":
+
+**`product-service` (NestJS):**
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+> npm test
+
+ PASS  src/product/product.service.spec.ts
+ Test Suites: 1 passed, 1 total
+ Tests:       1 passed, 1 total
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+**`order-service` (Go):**
 
-## Resources
+```bash
+> go test -v challenge-order-service/internal/order
 
-Check out a few resources that may come in handy when working with NestJS:
+=== RUN   TestOrder_BeforeCreate
+--- PASS: TestOrder_BeforeCreate (0.00s)
+PASS
+ok      challenge-order-service/internal/order  0.908s
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### 4.3. Hasil Tes Kinerja & Kekurangan
 
-## Support
+  * **Target:** `1000 requests/seconds` untuk `POST /orders`.
+  * **Hasil:** Gagal. Layanan mengalami *bottleneck* parah di **\~120-130 req/s** dan sebagian besar *request* mengalami `timeout`.
+  * **Diagnosis:** *Bottleneck* ini disebabkan oleh tiga operasi I/O sinkron (Tulis DB, Tulis RabbitMQ, Hapus Redis) yang terjadi pada setiap *request*. Untuk mencapai 1000 req/s, arsitektur `order-service` perlu diubah agar penulisan ke database (`repo.Save`) terjadi secara asinkron di *background worker*.
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+<!-- end list -->
 
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+```
+```
